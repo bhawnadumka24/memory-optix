@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Worst Fit Memory Management Simulation</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+
+        .memory-block, .process {
+            padding: 10px;
+            border-radius: 5px;
+            color: #fff;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .memory-free {
+            background-color: #6c757d;
+        }
+
+        .memory-allocated {
+            background-color: #007bff;
+        }
+
+        .process-allocated {
+            background-color: #28a745;
+        }
+
+        .process-unallocated {
+            background-color: #dc3545;
+        }
+
+        .highlight {
+            border: 3px solid #ffc107;
+            animation: highlight 1s infinite;
+        }
+
+        @keyframes highlight {
+            0% { box-shadow: 0 0 10px #ffc107; }
+            50% { box-shadow: 0 0 20px #ffc107; }
+            100% { box-shadow: 0 0 10px #ffc107; }
+        }
+
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            display: inline-block;
+            border-radius: 3px;
+        }
+
+        /* Scrollable Containers */
+        .memory-container, .process-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 class="text-center mb-4">Worst Fit Memory Management Simulation</h1>
+
+    <!-- Input Section -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5>Input Parameters</h5>
+                </div>
+                <div class="card-body">
+                    <form id="input-form">
+                        <div class="mb-3">
+                            <label for="memory-input" class="form-label">Memory Blocks (comma separated sizes)</label>
+                            <input type="text" class="form-control" id="memory-input" placeholder="e.g., 100, 500, 200, 300, 600" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="process-input" class="form-label">Processes (comma separated sizes)</label>
+                            <input type="text" class="form-control" id="process-input" placeholder="e.g., 212, 417, 112, 426" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Start Simulation</button>
+                        <button type="button" id="reset-btn" class="btn btn-secondary ms-2">Reset</button>
+                        <button type="button" class="btn btn-warning ms-2" onclick="window.location.href='index.html'">Back to Main</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend Section -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5>Legend</h5>
+                </div>
+                <div class="card-body">
+                    <p><span class="legend-box memory-free" style="background-color: #6c757d;"></span> Free Memory Block</p>
+                    <p><span class="legend-box memory-allocated" style="background-color: #007bff;"></span> Allocated Memory Block</p>
+                    <p><span class="legend-box process-allocated" style="background-color: #28a745;"></span> Allocated Process</p>
+                    <p><span class="legend-box process-unallocated" style="background-color: #dc3545;"></span> Unallocated Process</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visualization Section -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5>Memory Blocks</h5>
+                </div>
+                <div class="card-body memory-container" id="memory-blocks">
+                    <!-- Memory blocks will be rendered here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5>Processes</h5>
+                </div>
+                <div class="card-body process-container" id="processes">
+                    <!-- Processes will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS and dependencies (Popper.js and Bootstrap JS) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    document.getElementById('input-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const memoryInput = document.getElementById('memory-input').value;
+        const processInput = document.getElementById('process-input').value;
+
+        const memorySizes = memoryInput.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        const processSizes = processInput.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+
+        if (memorySizes.length === 0 || processSizes.length === 0) {
+            alert('Please enter valid memory and process sizes.');
+            return;
+        }
+
+        // Initialize memory blocks
+        const memoryBlocks = memorySizes.map((size, index) => ({
+            id: index + 1,
+            size: size,
+            remaining: size,
+            allocated: false,
+            process: null
+        }));
+
+        // Initialize processes
+        const processes = processSizes.map((size, index) => ({
+            id: index + 1,
+            size: size,
+            allocated: false,
+            blockId: null
+        }));
+
+        // Render initial memory blocks and processes
+        renderMemoryBlocks(memoryBlocks);
+        renderProcesses(processes);
+
+        // Disable input during simulation
+        disableInputs(true);
+
+        // Start simulation with delay
+        simulateWorstFit(memoryBlocks, processes);
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', function() {
+        // Clear memory and process containers
+        document.getElementById('memory-blocks').innerHTML = '';
+        document.getElementById('processes').innerHTML = '';
+
+        // Enable inputs
+        disableInputs(false);
+    });
+
+    function disableInputs(state) {
+        document.getElementById('memory-input').disabled = state;
+        document.getElementById('process-input').disabled = state;
+        document.getElementById('input-form').querySelector('button[type="submit"]').disabled = state;
+        document.getElementById('reset-btn').disabled = !state;
+    }
+
+    function renderMemoryBlocks(memoryBlocks) {
+        const memoryContainer = document.getElementById('memory-blocks');
+        memoryContainer.innerHTML = ''; // Clear previous
+
+        memoryBlocks.forEach(block => {
+            const blockDiv = document.createElement('div');
+            blockDiv.classList.add('memory-block', 'memory-free');
+            blockDiv.setAttribute('id', `block-${block.id}`);
+            blockDiv.style.width = '100%';
+            blockDiv.style.minHeight = '80px';
+            blockDiv.innerHTML = `
+                <strong>Block ${block.id}</strong><br>
+                Size: ${block.size}<br>
+                Remaining: ${block.remaining}
+            `;
+            memoryContainer.appendChild(blockDiv);
+        });
+    }
+
+    function renderProcesses(processes) {
+        const processContainer = document.getElementById('processes');
+        processContainer.innerHTML = ''; // Clear previous
+
+        processes.forEach(process => {
+            const procDiv = document.createElement('div');
+            procDiv.classList.add('process', 'process-unallocated');
+            procDiv.setAttribute('id', `process-${process.id}`);
+            procDiv.style.width = '100%';
+            procDiv.style.minHeight = '80px';
+            procDiv.innerHTML = `
+                <strong>Process ${process.id}</strong><br>
+                Size: ${process.size}<br>
+                Status: <span id="status-${process.id}">Unallocated</span>
+            `;
+            processContainer.appendChild(procDiv);
+        });
+    }
+
+    async function simulateWorstFit(memoryBlocks, processes) {
+        for (let i = 0; i < processes.length; i++) {
+            const process = processes[i];
+            let worstFitIndex = -1;
+            let largestRemaining = -1;
+
+            // Highlight the current process
+            const currentProcessDiv = document.getElementById(`process-${process.id}`);
+            currentProcessDiv.classList.remove('process-unallocated', 'process-allocated');
+            currentProcessDiv.classList.add('highlight', 'process-unallocated');
+
+            // Find the worst fit block
+            for (let j = 0; j < memoryBlocks.length; j++) {
+                const block = memoryBlocks[j];
+                if (block.remaining >= process.size && block.remaining > largestRemaining) {
+                    worstFitIndex = j;
+                    largestRemaining = block.remaining;
+                }
+            }
+
+            if (worstFitIndex !== -1) {
+                const block = memoryBlocks[worstFitIndex];
+                const blockDiv = document.getElementById(`block-${block.id}`);
+
+                // Highlight the selected block
+                blockDiv.classList.add('highlight');
+
+                await delay(1000); // Wait for 1 second
+
+                // Allocate the process to this block
+                block.remaining -= process.size;
+                block.allocated = true;
+                block.process = process.id;
+                process.allocated = true;
+                process.blockId = block.id;
+
+                // Update block appearance
+                blockDiv.classList.remove('memory-free');
+                blockDiv.classList.add('memory-allocated');
+                blockDiv.innerHTML = `
+                    <strong>Block ${block.id}</strong><br>
+                    Size: ${block.size}<br>
+                    Remaining: ${block.remaining}<br>
+                    Allocated to: Process ${process.id}
+                `;
+
+                // Update process appearance
+                currentProcessDiv.classList.remove('process-unallocated', 'highlight');
+                currentProcessDiv.classList.add('process-allocated');
+                document.getElementById(`status-${process.id}`).innerText = `Allocated to Block ${block.id}`;
+
+                // Remove highlight from block
+                blockDiv.classList.remove('highlight');
+            } else {
+                // Process not allocated
+                currentProcessDiv.classList.remove('highlight');
+                document.getElementById(`status-${process.id}`).innerText = `Not Allocated`;
+            }
+
+            await delay(1000); // Wait before next process
+        }
+
+        // Remove all highlights
+        document.querySelectorAll('.highlight').forEach(element => {
+            element.classList.remove('highlight');
+        });
+
+        // Enable reset button
+        disableInputs(false);
+    }
+
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // Optional: Initialize with default values
+    window.onload = function() {
+        document.getElementById('memory-input').value = "100, 500, 200, 300, 600";
+        document.getElementById('process-input').value = "212, 417, 112, 426";
+        document.getElementById('input-form').dispatchEvent(new Event('submit'));
+    }
+</script>
+
+</body>
+</html>
